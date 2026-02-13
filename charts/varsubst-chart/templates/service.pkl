@@ -1,0 +1,21 @@
+# Example Pkl template for a Kubernetes Service
+# This file is rendered by the varsubst-render plugin
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${release.name}
+  namespace: ${release.namespace}
+  labels:
+    app.kubernetes.io/name: ${chart.name}
+    app.kubernetes.io/version: ${chart.version}
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: ${chart.name}

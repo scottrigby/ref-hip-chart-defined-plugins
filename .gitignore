@@ -1,0 +1,17 @@
+# Build artifacts
+bin/
+dist/
+plugins/*/plugin.wasm
+charts/*/plugin.wasm
+
+# Helm binary and build directory (auto-fetched from fork by Makefile)
+helm
+.helm-build/
+
+# Chart.lock files - these test charts use local OCI registry with digests
+# that change on every plugin rebuild. For production charts, you'd typically
+# commit Chart.lock for reproducible builds.
+charts/*/Chart.lock
+
+# Temporary files
+*.tmp

@@ -1,0 +1,9 @@
+apiVersion: v1
+name: sourcefiles-modifier
+version: 0.1.0
+description: A test render/v1 plugin that modifies SourceFiles for testing sequential plugin handoff
+runtime: extism/v1
+type: render/v1
+config:
+  patterns:
+    - "templates/*.test"

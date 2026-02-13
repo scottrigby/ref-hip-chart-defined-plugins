@@ -1,0 +1,14 @@
+apiVersion: v1
+name: gotemplate-render
+version: 0.1.0
+description: A render/v1 plugin for Go templates - reference implementation for Charts v3
+runtime: extism/v1
+type: render/v1
+config:
+  patterns:
+    - "templates/*.yaml"
+    - "templates/*.yml"
+    - "templates/*.tpl"
+    - "templates/*.txt"
+    - "templates/**/*.yaml"
+    - "templates/**/*.yml"

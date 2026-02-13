@@ -1,0 +1,24 @@
+apiVersion: v2
+name: sequential-plugins-test
+version: 1.0.0
+description: A test chart for verifying sequential render plugin SourceFiles handoff
+
+# Chart-defined plugins (processed sequentially in list order)
+# Plugin 1 (sourcefiles-modifier) runs first and modifies the SourceFiles:
+#   - Removes file1.test
+#   - Modifies file2.test content
+#   - Renames file3.test to file3.renamed
+#   - Adds file4.test
+# Plugin 2 (test-processor) runs second and should receive:
+#   - file2.test (with modified content)
+#   - file4.test (newly added by plugin 1)
+#   - Should NOT receive: file1.test (removed), file3.renamed (extension changed)
+plugins:
+  - name: sourcefiles-modifier
+    type: render/v1
+    repository: oci://127.0.0.1:5001/plugins/sourcefiles-modifier
+    version: 0.1.0
+  - name: test-processor
+    type: render/v1
+    repository: oci://127.0.0.1:5001/plugins/test-processor
+    version: 0.1.0

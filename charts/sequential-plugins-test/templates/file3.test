@@ -1,0 +1,5 @@
+# File 3 - This file should be RENAMED by plugin 1
+# Extension will change from .test to .renamed
+# test-processor should NOT see this (wrong extension)
+key: file3-original-content
+status: should-be-renamed

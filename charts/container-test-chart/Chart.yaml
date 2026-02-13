@@ -1,0 +1,11 @@
+apiVersion: v2
+name: container-test-chart
+version: 1.0.0
+description: Test chart for OCI download when running inside a container (e.g., Claude dev container)
+
+# Uses host.containers.internal for container-to-host networking
+plugins:
+  - name: varsubst-render
+    type: render/v1
+    repository: oci://host.containers.internal:5001/plugins/varsubst-render
+    version: 0.1.0

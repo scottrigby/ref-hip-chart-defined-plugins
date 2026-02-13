@@ -1,0 +1,4 @@
+# File 1 - This file should be REMOVED by plugin 1
+# If test-processor sees this file, something is wrong
+key: file1-original-content
+status: should-be-removed

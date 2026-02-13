@@ -1,0 +1,10 @@
+apiVersion: v2
+name: gotemplate-example
+version: 1.0.0
+description: A test chart for the gotemplate render plugin
+
+plugins:
+  - name: gotemplate-render
+    type: render/v1
+    repository: oci://127.0.0.1:5001/plugins/gotemplate-render
+    version: 0.1.0

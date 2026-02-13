@@ -1,0 +1,12 @@
+apiVersion: v2
+name: echo-chart
+version: 1.0.0
+description: Test chart for source-distributed plugin
+
+# This plugin is distributed as source code in the OCI registry.
+# Helm will download and compile it automatically.
+plugins:
+  - name: echo-render
+    version: 0.1.0
+    type: render/v1
+    repository: oci://127.0.0.1:5001/plugins/echo-render

@@ -1,0 +1,12 @@
+apiVersion: v2
+name: varsubst-example
+version: 1.0.0
+description: An example Helm chart using the varsubst-render plugin
+type: application
+
+# Chart-defined plugins (processed sequentially in list order)
+plugins:
+  - name: varsubst-render
+    type: render/v1
+    repository: oci://127.0.0.1:5001/plugins/varsubst-render
+    version: 0.1.0

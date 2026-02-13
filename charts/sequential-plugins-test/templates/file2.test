@@ -1,0 +1,4 @@
+# File 2 - This file should be MODIFIED by plugin 1
+# test-processor should see this with "[MODIFIED BY PLUGIN 1]" prefix
+key: file2-original-content
+status: should-be-modified

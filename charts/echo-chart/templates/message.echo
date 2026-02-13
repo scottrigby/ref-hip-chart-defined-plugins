@@ -1,0 +1,4 @@
+# This file will be processed by the echo-render plugin
+# The plugin echoes back the content with metadata
+message: Hello from source-compiled plugin!
+release: ${release.name}
