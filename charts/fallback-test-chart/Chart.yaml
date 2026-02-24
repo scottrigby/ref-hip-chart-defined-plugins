@@ -1,4 +1,4 @@
-apiVersion: v2
+apiVersion: v3
 name: fallback-test-chart
 version: 1.0.0
 description: Test chart for verifying fallback to globally installed plugin path

@@ -1,4 +1,4 @@
-apiVersion: v2
+apiVersion: v3
 name: sequential-plugins-test
 version: 1.0.0
 description: A test chart for verifying sequential render plugin SourceFiles handoff

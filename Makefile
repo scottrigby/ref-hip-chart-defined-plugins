@@ -141,9 +141,10 @@ oci-push-all:
 		echo -e "$(GREEN)Pushing $$plugin to OCI registry...$(NC)"; \
 		VERSION=$$(grep 'version:' $(CURDIR)/plugins/$$plugin/plugin.yaml | head -1 | awk '{print $$2}'); \
 		TMPDIR=$$(mktemp -d); \
-		cp $(CURDIR)/plugins/$$plugin/plugin.yaml "$$TMPDIR/"; \
-		cp $(CURDIR)/plugins/$$plugin/plugin.wasm "$$TMPDIR/"; \
-		(cd "$$TMPDIR" && tar czf $$plugin-$$VERSION.tgz plugin.yaml plugin.wasm && \
+		mkdir -p "$$TMPDIR/$$plugin"; \
+		cp $(CURDIR)/plugins/$$plugin/plugin.yaml "$$TMPDIR/$$plugin/"; \
+		cp $(CURDIR)/plugins/$$plugin/plugin.wasm "$$TMPDIR/$$plugin/"; \
+		(cd "$$TMPDIR" && tar czf $$plugin-$$VERSION.tgz $$plugin && \
 			oras push --plain-http \
 				--disable-path-validation \
 				--artifact-type "application/vnd.helm.plugin.v1+json" \

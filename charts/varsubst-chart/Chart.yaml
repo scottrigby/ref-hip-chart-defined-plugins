@@ -1,4 +1,4 @@
-apiVersion: v2
+apiVersion: v3
 name: varsubst-example
 version: 1.0.0
 description: An example Helm chart using the varsubst-render plugin

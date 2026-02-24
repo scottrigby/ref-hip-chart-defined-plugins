@@ -1,4 +1,4 @@
-apiVersion: v2
+apiVersion: v3
 name: container-test-chart
 version: 1.0.0
 description: Test chart for OCI download when running inside a container (e.g., Claude dev container)

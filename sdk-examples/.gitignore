@@ -1,0 +1,7 @@
+# Built binaries
+simple-render
+serverless-render
+simple
+
+# Plugin archives (regenerated from plugins/ on rebuild)
+*.plugin

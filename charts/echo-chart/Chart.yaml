@@ -1,4 +1,4 @@
-apiVersion: v2
+apiVersion: v3
 name: echo-chart
 version: 1.0.0
 description: Test chart for source-distributed plugin
