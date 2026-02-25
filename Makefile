@@ -319,3 +319,58 @@ show-cache:
 	ls -la "$(CONTENT_CACHE)"/*.plugin 2>/dev/null || echo "  (empty)"
 	@echo -e "$(GREEN)Wazero cache:$(NC)"
 	ls -la "$(WAZERO_CACHE)" 2>/dev/null || echo "  (empty)"
+
+# =============================================================================
+# Mock ArtifactHub server
+# =============================================================================
+
+.PHONY: mock-artifacthub
+mock-artifacthub:
+	@echo -e "$(GREEN)Starting mock ArtifactHub server...$(NC)"
+	go run ./mock-artifacthub --registry ghcr.io/scottrigby/ref-hip-chart-defined-plugins
+
+.PHONY: mock-artifacthub-local
+mock-artifacthub-local:
+	@echo -e "$(GREEN)Starting mock ArtifactHub server (local registry)...$(NC)"
+	go run ./mock-artifacthub --registry $(OCI_REGISTRY)
+
+# =============================================================================
+# Container e2e test (tests ArtifactHub integration from within container)
+# =============================================================================
+
+CONTAINER_OCI_REGISTRY := host.containers.internal:5001
+MOCK_ARTIFACTHUB_PORT := 8765
+
+.PHONY: test-container-e2e
+test-container-e2e: build-plugins
+	@echo -e "$(GREEN)Running container e2e test with mock ArtifactHub...$(NC)"
+	@# Build mock server
+	go build -o mock-server ./mock-artifacthub
+	@# Start mock server in background
+	./mock-server --registry $(CONTAINER_OCI_REGISTRY) --port $(MOCK_ARTIFACTHUB_PORT) &
+	@sleep 2
+	@# Push plugins to OCI registry (using container-accessible address)
+	@for plugin in $(PLUGINS); do \
+		VERSION=$$(grep 'version:' plugins/$$plugin/plugin.yaml | head -1 | awk '{print $$2}'); \
+		TMPDIR=$$(mktemp -d); \
+		mkdir -p "$$TMPDIR/$$plugin"; \
+		cp plugins/$$plugin/plugin.yaml "$$TMPDIR/$$plugin/"; \
+		cp plugins/$$plugin/plugin.wasm "$$TMPDIR/$$plugin/"; \
+		(cd "$$TMPDIR" && tar czf $$plugin-$$VERSION.tgz $$plugin && \
+			oras push --plain-http \
+				--disable-path-validation \
+				--artifact-type "application/vnd.helm.plugin.v1+json" \
+				$(CONTAINER_OCI_REGISTRY)/plugins/$$plugin:$$VERSION \
+				"$$plugin-$$VERSION.tgz:application/vnd.oci.image.layer.v1.tar+gzip"); \
+		rm -rf "$$TMPDIR"; \
+	done
+	@# Test dependency update with mock ArtifactHub
+	@rm -f "$(CONTENT_CACHE)"/*.plugin 2>/dev/null || true
+	$(HELM_BIN) dependency update charts/container-test-chart/ --plain-http \
+		--artifacthub-endpoint http://localhost:$(MOCK_ARTIFACTHUB_PORT)
+	@# Verify plugin was cached
+	@test -n "$$(find "$(HELM_CACHE_HOME)/content" -name '*.plugin' 2>/dev/null | head -1)" || \
+		(echo "FAIL: No plugins in content cache" && exit 1)
+	@echo -e "$(GREEN)Container e2e test passed!$(NC)"
+	@# Clean up mock server
+	@pkill -f "mock-server --registry" || true

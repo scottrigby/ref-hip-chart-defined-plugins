@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - "plugins/**"
+      - "charts/**"
+      - "Makefile"
+  push:
+    branches:
+      - main
+    paths:
+      - "plugins/**"
+      - "charts/**"
+      - "Makefile"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Install TinyGo
+        run: |
+          wget https://github.com/tinygo-org/tinygo/releases/download/v0.34.0/tinygo_0.34.0_amd64.deb
+          sudo dpkg -i tinygo_0.34.0_amd64.deb
+          tinygo version
+
+      - name: Build Wasm plugins
+        run: |
+          for plugin in plugins/*/; do
+            if [ -f "$plugin/go.mod" ]; then
+              echo "Building plugin: $plugin"
+              cd "$plugin"
+              tinygo build -o plugin.wasm -target=wasip1 .
+              echo "Built: $(ls -la plugin.wasm)"
+              cd - > /dev/null
+            fi
+          done
+
+      - name: Validate plugins
+        run: |
+          EXIT_CODE=0
+          for plugin in plugins/*/; do
+            PLUGIN_NAME=$(basename "$plugin")
+            echo "Checking $PLUGIN_NAME..."
+
+            if [ ! -f "$plugin/plugin.yaml" ]; then
+              echo "::error::Missing plugin.yaml in $plugin"
+              EXIT_CODE=1
+              continue
+            fi
+
+            for field in apiVersion name version; do
+              if ! grep -q "^$field:" "$plugin/plugin.yaml"; then
+                echo "::error::Missing $field in $plugin/plugin.yaml"
+                EXIT_CODE=1
+              fi
+            done
+
+            RUNTIME=$(grep '^runtime:' "$plugin/plugin.yaml" | sed 's/runtime: *//' | tr -d '"' | tr -d "'" || echo "")
+            if [ "$RUNTIME" = "extism/v1" ] && [ ! -f "$plugin/plugin.wasm" ]; then
+              echo "::error::Missing plugin.wasm for extism/v1 plugin $PLUGIN_NAME"
+              EXIT_CODE=1
+            fi
+          done
+          exit $EXIT_CODE
+
+      - name: Validate charts
+        run: |
+          EXIT_CODE=0
+          for chart in charts/*/; do
+            CHART_NAME=$(basename "$chart")
+            echo "Checking $CHART_NAME..."
+
+            if [ ! -f "$chart/Chart.yaml" ]; then
+              echo "::error::Missing Chart.yaml in $chart"
+              EXIT_CODE=1
+              continue
+            fi
+
+            for field in apiVersion name version; do
+              if ! grep -q "^$field:" "$chart/Chart.yaml"; then
+                echo "::error::Missing $field in $chart/Chart.yaml"
+                EXIT_CODE=1
+              fi
+            done
+          done
+          exit $EXIT_CODE
+
+  version-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check plugin version bumps
+        run: |
+          EXIT_CODE=0
+          changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^plugins/[^/]+/' | cut -d/ -f1-2 | sort -u || true)
+
+          while IFS= read -r plugin; do
+            if [ -z "$plugin" ]; then continue; fi
+
+            if [ ! -f "$plugin/plugin.yaml" ]; then continue; fi
+
+            VERSION=$(grep '^version:' "$plugin/plugin.yaml" | sed 's/version: *//' | tr -d '"' | tr -d "'")
+            PLUGIN_NAME=$(basename "$plugin")
+            TAG="plugin/${PLUGIN_NAME}-${VERSION}"
+
+            if git rev-parse --verify "refs/tags/${TAG}" >/dev/null 2>&1; then
+              echo "::error::Version $VERSION for plugin $PLUGIN_NAME already exists. Please bump the version."
+              EXIT_CODE=1
+            fi
+          done <<< "$changed"
+          exit $EXIT_CODE
+
+      - name: Check chart version bumps
+        run: |
+          EXIT_CODE=0
+          changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^charts/[^/]+/' | cut -d/ -f1-2 | sort -u || true)
+
+          while IFS= read -r chart; do
+            if [ -z "$chart" ]; then continue; fi
+
+            if [ ! -f "$chart/Chart.yaml" ]; then continue; fi
+
+            VERSION=$(grep '^version:' "$chart/Chart.yaml" | sed 's/version: *//' | tr -d '"' | tr -d "'")
+            CHART_NAME=$(basename "$chart")
+            TAG="chart/${CHART_NAME}-${VERSION}"
+
+            if git rev-parse --verify "refs/tags/${TAG}" >/dev/null 2>&1; then
+              echo "::error::Version $VERSION for chart $CHART_NAME already exists. Please bump the version."
+              EXIT_CODE=1
+            fi
+          done <<< "$changed"
+          exit $EXIT_CODE

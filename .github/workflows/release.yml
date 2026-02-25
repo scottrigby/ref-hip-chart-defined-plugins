@@ -1,0 +1,235 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "plugins/**"
+      - "charts/**"
+
+env:
+  REGISTRY: ghcr.io
+  REPO_PATH: ${{ github.repository }}
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      plugins: ${{ steps.changes.outputs.plugins }}
+      charts: ${{ steps.changes.outputs.charts }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}
+          fetch-depth: 0
+
+      - name: Detect changed plugins and charts
+        id: changes
+        run: |
+          # Get changed plugin directories
+          plugins=$(git diff --name-only HEAD~1...HEAD | grep -E '^plugins/[^/]+/' | cut -d/ -f1-2 | sort -u || true)
+          # Get changed chart directories
+          charts=$(git diff --name-only HEAD~1...HEAD | grep -E '^charts/[^/]+/' | cut -d/ -f1-2 | sort -u || true)
+
+          # Output as JSON arrays
+          plugins_json=$(echo "$plugins" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          charts_json=$(echo "$charts" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          echo "plugins=$plugins_json" >> $GITHUB_OUTPUT
+          echo "charts=$charts_json" >> $GITHUB_OUTPUT
+          echo "Changed plugins: $plugins"
+          echo "Changed charts: $charts"
+
+  release-plugins:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.plugins != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        plugin: ${{ fromJson(needs.detect-changes.outputs.plugins) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}
+          fetch-depth: 0
+
+      - name: Extract plugin info
+        id: plugin
+        run: |
+          PLUGIN_DIR="${{ matrix.plugin }}"
+          PLUGIN_NAME=$(basename "$PLUGIN_DIR")
+
+          if [ ! -f "$PLUGIN_DIR/plugin.yaml" ]; then
+            echo "::warning::Missing plugin.yaml in $PLUGIN_DIR, skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          VERSION=$(grep '^version:' "$PLUGIN_DIR/plugin.yaml" | sed 's/version: *//' | tr -d '"' | tr -d "'")
+          TAG="plugin/${PLUGIN_NAME}-${VERSION}"
+
+          # Check if already released
+          if git rev-parse --verify "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "name=$PLUGIN_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "dir=$PLUGIN_DIR" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+
+      - name: Set up Go
+        if: steps.plugin.outputs.skip != 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Install Helm 4 (from fork)
+        if: steps.plugin.outputs.skip != 'true'
+        run: |
+          git clone --depth 1 --branch chart-defined-plugins https://github.com/scottrigby/helm.git helm-build
+          cd helm-build && make build
+          sudo mv bin/helm /usr/local/bin/helm
+          rm -rf helm-build
+          helm version
+
+      - name: Set up ORAS
+        if: steps.plugin.outputs.skip != 'true'
+        uses: oras-project/setup-oras@v1
+
+      - name: Log in to Container Registry
+        if: steps.plugin.outputs.skip != 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package plugin
+        if: steps.plugin.outputs.skip != 'true'
+        id: package
+        run: |
+          PLUGIN_DIR="${{ steps.plugin.outputs.dir }}"
+          PACKAGE="${{ steps.plugin.outputs.name }}-${{ steps.plugin.outputs.version }}.tgz"
+
+          if [ "${{ vars.SIGN_PLUGINS }}" = "true" ] && [ -n "${{ secrets.GPG_KEYRING_BASE64 }}" ]; then
+            echo "Signing plugin package..."
+            base64 -d <<< "${{ secrets.GPG_KEYRING_BASE64 }}" > secring.gpg
+            echo "${{ secrets.GPG_PASSPHRASE }}" > passphrase.txt
+            helm plugin package --sign \
+              --key '${{ vars.SIGNING_KEY_EMAIL }}' \
+              --keyring secring.gpg \
+              --passphrase-file passphrase.txt \
+              "$PLUGIN_DIR"
+            rm -f passphrase.txt secring.gpg
+            echo "signed=true" >> $GITHUB_OUTPUT
+          else
+            helm plugin package --sign=false "$PLUGIN_DIR"
+            echo "signed=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "package=$PACKAGE" >> $GITHUB_OUTPUT
+
+      - name: Push to OCI registry
+        if: steps.plugin.outputs.skip != 'true'
+        run: |
+          PACKAGE="${{ steps.package.outputs.package }}"
+          OCI_PATH="${{ env.REGISTRY }}/${{ env.REPO_PATH }}/plugins/${{ steps.plugin.outputs.name }}:${{ steps.plugin.outputs.version }}"
+
+          echo "Pushing to: $OCI_PATH"
+
+          if [ -f "$PACKAGE.prov" ]; then
+            oras push "$OCI_PATH" \
+              --artifact-type application/vnd.helm.plugin.v1+json \
+              "$PACKAGE" "$PACKAGE.prov"
+          else
+            oras push "$OCI_PATH" \
+              --artifact-type application/vnd.helm.plugin.v1+json \
+              "$PACKAGE"
+          fi
+
+      - name: Create tag
+        if: steps.plugin.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.plugin.outputs.tag }}" -m "Release plugin ${{ steps.plugin.outputs.name }} v${{ steps.plugin.outputs.version }}"
+          git push origin "${{ steps.plugin.outputs.tag }}"
+
+  release-charts:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.charts != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        chart: ${{ fromJson(needs.detect-changes.outputs.charts) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT }}
+          fetch-depth: 0
+
+      - name: Extract chart info
+        id: chart
+        run: |
+          CHART_DIR="${{ matrix.chart }}"
+          CHART_NAME=$(basename "$CHART_DIR")
+
+          if [ ! -f "$CHART_DIR/Chart.yaml" ]; then
+            echo "::warning::Missing Chart.yaml in $CHART_DIR, skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          VERSION=$(grep '^version:' "$CHART_DIR/Chart.yaml" | sed 's/version: *//' | tr -d '"' | tr -d "'")
+          TAG="chart/${CHART_NAME}-${VERSION}"
+
+          # Check if already released
+          if git rev-parse --verify "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "name=$CHART_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "dir=$CHART_DIR" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+
+      - name: Set up Helm
+        if: steps.chart.outputs.skip != 'true'
+        uses: azure/setup-helm@v4
+
+      - name: Log in to Container Registry
+        if: steps.chart.outputs.skip != 'true'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Package and push chart
+        if: steps.chart.outputs.skip != 'true'
+        run: |
+          CHART_DIR="${{ steps.chart.outputs.dir }}"
+          OCI_PATH="oci://${{ env.REGISTRY }}/${{ env.REPO_PATH }}/charts"
+
+          helm package "$CHART_DIR"
+          helm push "${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz" "$OCI_PATH"
+
+      - name: Create tag
+        if: steps.chart.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.chart.outputs.tag }}" -m "Release chart ${{ steps.chart.outputs.name }} v${{ steps.chart.outputs.version }}"
+          git push origin "${{ steps.chart.outputs.tag }}"

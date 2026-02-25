@@ -15,3 +15,10 @@ charts/*/Chart.lock
 
 # Temporary files
 *.tmp
+
+# Mock ArtifactHub server binary
+mock-artifacthub/mock-server
+
+# GH Actions setup files
+keyring.base64
+public.asc
