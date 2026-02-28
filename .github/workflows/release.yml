@@ -118,8 +118,14 @@ jobs:
         run: |
           git clone --depth 1 --branch chart-defined-plugins https://github.com/scottrigby/helm.git helm-build
           cd helm-build && make build
-          sudo mv bin/helm /usr/local/bin/helm
+          mkdir -p $HOME/.local/bin
+          mv bin/helm $HOME/.local/bin/helm
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
           rm -rf helm-build
+      - name: Verify Helm version
+        if: steps.plugin.outputs.skip != 'true'
+        run: |
+          which helm
           helm version
 
       - name: Set up ORAS
@@ -239,8 +245,15 @@ jobs:
         run: |
           git clone --depth 1 --branch chart-defined-plugins https://github.com/scottrigby/helm.git helm-build
           cd helm-build && make build
-          sudo mv bin/helm /usr/local/bin/helm
+          mkdir -p $HOME/.local/bin
+          mv bin/helm $HOME/.local/bin/helm
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
           rm -rf helm-build
+
+      - name: Verify Helm version
+        if: steps.chart.outputs.skip != 'true'
+        run: |
+          which helm
           helm version
 
       - name: Log in to Container Registry

@@ -1,6 +1,6 @@
 apiVersion: v3
 name: container-test-chart
-version: 1.0.0
+version: 1.0.1
 description: Test chart for OCI download when running inside a container (e.g., Claude dev container)
 
 # Uses host.containers.internal for container-to-host networking
