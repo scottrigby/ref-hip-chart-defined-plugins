@@ -1,6 +1,6 @@
 apiVersion: v3
 name: sequential-plugins-test
-version: 1.0.4
+version: 1.0.5
 description: A test chart for verifying sequential render plugin SourceFiles handoff
 
 # Chart-defined plugins (processed sequentially in list order)
@@ -16,9 +16,9 @@ description: A test chart for verifying sequential render plugin SourceFiles han
 plugins:
   - name: sourcefiles-modifier
     type: render/v1
-    repository: oci://127.0.0.1:5001/plugins/sourcefiles-modifier
+    repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/sourcefiles-modifier
     version: 0.1.3
   - name: test-processor
     type: render/v1
-    repository: oci://127.0.0.1:5001/plugins/test-processor
+    repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/test-processor
     version: 0.1.3

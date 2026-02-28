@@ -1,6 +1,6 @@
 apiVersion: v3
 name: varsubst-chart
-version: 1.0.4
+version: 1.0.5
 description: An example Helm chart using the varsubst-render plugin
 type: application
 
@@ -8,5 +8,5 @@ type: application
 plugins:
   - name: varsubst-render
     type: render/v1
-    repository: oci://127.0.0.1:5001/plugins/varsubst-render
+    repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/varsubst-render
     version: 0.1.3

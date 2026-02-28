@@ -1,10 +1,10 @@
 apiVersion: v3
 name: gotemplate-chart
-version: 1.0.4
+version: 1.0.5
 description: A test chart for the gotemplate render plugin
 
 plugins:
   - name: gotemplate-render
     type: render/v1
-    repository: oci://127.0.0.1:5001/plugins/gotemplate-render
+    repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/gotemplate-render
     version: 0.1.3
