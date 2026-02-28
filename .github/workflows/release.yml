@@ -92,7 +92,8 @@ jobs:
         if: steps.plugin.outputs.skip != 'true'
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24"
+          go-version: "1.25"
+          cache: false # go.sum files are in plugin subdirectories
 
       - name: Install Helm 4 (from fork)
         if: steps.plugin.outputs.skip != 'true'
@@ -208,9 +209,21 @@ jobs:
           echo "dir=$CHART_DIR" >> $GITHUB_OUTPUT
           echo "skip=false" >> $GITHUB_OUTPUT
 
-      - name: Set up Helm
+      - name: Set up Go
         if: steps.chart.outputs.skip != 'true'
-        uses: azure/setup-helm@v4
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: false
+
+      - name: Install Helm 4 (from fork)
+        if: steps.chart.outputs.skip != 'true'
+        run: |
+          git clone --depth 1 --branch chart-defined-plugins https://github.com/scottrigby/helm.git helm-build
+          cd helm-build && make build
+          sudo mv bin/helm /usr/local/bin/helm
+          rm -rf helm-build
+          helm version
 
       - name: Log in to Container Registry
         if: steps.chart.outputs.skip != 'true'
