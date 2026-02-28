@@ -95,6 +95,24 @@ jobs:
           go-version: "1.25"
           cache: false # go.sum files are in plugin subdirectories
 
+      - name: Install TinyGo
+        if: steps.plugin.outputs.skip != 'true'
+        run: |
+          wget https://github.com/tinygo-org/tinygo/releases/download/v0.39.0/tinygo_0.39.0_amd64.deb
+          sudo dpkg -i tinygo_0.39.0_amd64.deb
+          tinygo version
+
+      - name: Build Wasm plugin
+        if: steps.plugin.outputs.skip != 'true'
+        run: |
+          PLUGIN_DIR="${{ steps.plugin.outputs.dir }}"
+          if [ -f "$PLUGIN_DIR/go.mod" ]; then
+            echo "Building wasm for $PLUGIN_DIR"
+            cd "$PLUGIN_DIR"
+            tinygo build -o plugin.wasm -target=wasip1 .
+            ls -la plugin.wasm
+          fi
+
       - name: Install Helm 4 (from fork)
         if: steps.plugin.outputs.skip != 'true'
         run: |
