@@ -75,6 +75,7 @@ type Config struct {
 	RepoName   string // Repository name for ArtifactHub
 	RepoID     string // Repository ID
 	SigningKey string // URL to signing key (optional)
+	PluginsDir string // Local plugins directory for fallback discovery
 }
 
 // Server handles mock ArtifactHub API requests.
@@ -105,13 +106,22 @@ func NewServer(cfg Config) *Server {
 func (s *Server) discoverPlugins() error {
 	log.Printf("Discovering plugins from %s/plugins...", s.config.Registry)
 
-	// Use oras to list repositories
-	// Note: This requires oras CLI to be installed
+	// GHCR doesn't support the catalog API, so we discover plugin names from
+	// local directory and then fetch versions from the registry
+	if strings.HasPrefix(s.config.Registry, "ghcr.io") {
+		return s.discoverPluginsFromLocal()
+	}
+
+	// For other registries, try oras repo ls
 	cmd := exec.Command("oras", "repo", "ls", fmt.Sprintf("%s/plugins", s.config.Registry))
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
+		log.Printf("OCI discovery failed (oras repo ls): %v", err)
+		if len(output) > 0 {
+			log.Printf("oras output: %s", string(output))
+		}
 		// Fallback: try to discover from local plugins directory
-		return s.discoverLocalPlugins()
+		return s.discoverPluginsFromLocal()
 	}
 
 	repos := strings.Split(strings.TrimSpace(string(output)), "\n")
@@ -129,12 +139,60 @@ func (s *Server) discoverPlugins() error {
 	return nil
 }
 
+// discoverPluginsFromLocal discovers plugin names from local directory,
+// then fetches versions from the OCI registry if GITHUB_TOKEN is available.
+func (s *Server) discoverPluginsFromLocal() error {
+	pluginsDir := s.config.PluginsDir
+	log.Printf("Discovering plugin names from: %s", pluginsDir)
+
+	entries, err := os.ReadDir(pluginsDir)
+	if err != nil {
+		return fmt.Errorf("failed to read plugins directory %s: %w", pluginsDir, err)
+	}
+
+	token := os.Getenv("GITHUB_TOKEN")
+	useOCI := token != "" && strings.HasPrefix(s.config.Registry, "ghcr.io")
+
+	if useOCI {
+		log.Println("Using GITHUB_TOKEN to fetch versions from GHCR")
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		pluginName := entry.Name()
+
+		// Try to get versions from OCI registry
+		if useOCI {
+			if err := s.discoverPluginVersions(pluginName); err != nil {
+				log.Printf("Warning: failed to discover OCI versions for %s: %v, using local", pluginName, err)
+				s.addLocalPlugin(pluginName)
+			}
+		} else {
+			s.addLocalPlugin(pluginName)
+		}
+	}
+
+	return nil
+}
+
 // discoverPluginVersions discovers all versions of a plugin.
 func (s *Server) discoverPluginVersions(pluginName string) error {
 	ref := fmt.Sprintf("%s/plugins/%s", s.config.Registry, pluginName)
 
 	// Use oras to list tags
-	cmd := exec.Command("oras", "repo", "tags", ref)
+	var cmd *exec.Cmd
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" && strings.HasPrefix(s.config.Registry, "ghcr.io") {
+		cmd = exec.Command("oras", "repo", "tags",
+			"--username", "_",
+			"--password-stdin",
+			ref)
+		cmd.Stdin = strings.NewReader(token)
+	} else {
+		cmd = exec.Command("oras", "repo", "tags", ref)
+	}
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to list tags for %s: %w", ref, err)
@@ -177,62 +235,46 @@ func (s *Server) discoverPluginVersions(pluginName string) error {
 	return nil
 }
 
-// discoverLocalPlugins falls back to discovering plugins from local directory.
-func (s *Server) discoverLocalPlugins() error {
-	log.Println("Falling back to local plugin discovery...")
+// addLocalPlugin adds a plugin by reading its metadata from local plugin.yaml.
+func (s *Server) addLocalPlugin(pluginName string) {
+	pluginYaml := fmt.Sprintf("%s/%s/plugin.yaml", s.config.PluginsDir, pluginName)
 
-	entries, err := os.ReadDir("plugins")
+	data, err := os.ReadFile(pluginYaml)
 	if err != nil {
-		return fmt.Errorf("failed to read plugins directory: %w", err)
+		log.Printf("Warning: no plugin.yaml for %s: %v", pluginName, err)
+		return
 	}
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		pluginName := entry.Name()
-		pluginYaml := fmt.Sprintf("plugins/%s/plugin.yaml", pluginName)
-
-		data, err := os.ReadFile(pluginYaml)
-		if err != nil {
-			log.Printf("Warning: no plugin.yaml for %s: %v", pluginName, err)
-			continue
-		}
-
-		// Simple YAML parsing for version
-		version := extractYAMLField(string(data), "version")
-		if version == "" {
-			version = "0.1.0"
-		}
-
-		pluginType := extractYAMLField(string(data), "type")
-		if pluginType == "" {
-			pluginType = "render/v1"
-		}
-
-		pkg := PluginPackage{
-			PackageID:   fmt.Sprintf("%s-%s", pluginName, version),
-			Name:        pluginName,
-			DisplayName: formatDisplayName(pluginName),
-			Description: extractYAMLField(string(data), "description"),
-			Version:     version,
-			License:     "Apache-2.0",
-			ContentURL:  fmt.Sprintf("oci://%s/plugins/%s:%s", s.config.Registry, pluginName, version),
-			Repository:  s.registry,
-			Data: &PluginData{
-				PluginType:            pluginType,
-				Runtime:               extractYAMLField(string(data), "runtime"),
-				HelmVersionConstraint: ">=4.0.0",
-			},
-			Keywords: []string{"helm", "helm-plugin", "helm4", pluginType},
-		}
-
-		s.plugins[pluginName] = append(s.plugins[pluginName], pkg)
-		log.Printf("Discovered local plugin: %s@%s", pluginName, version)
+	// Simple YAML parsing for version
+	version := extractYAMLField(string(data), "version")
+	if version == "" {
+		version = "0.1.0"
 	}
 
-	return nil
+	pluginType := extractYAMLField(string(data), "type")
+	if pluginType == "" {
+		pluginType = "render/v1"
+	}
+
+	pkg := PluginPackage{
+		PackageID:   fmt.Sprintf("%s-%s", pluginName, version),
+		Name:        pluginName,
+		DisplayName: formatDisplayName(pluginName),
+		Description: extractYAMLField(string(data), "description"),
+		Version:     version,
+		License:     "Apache-2.0",
+		ContentURL:  fmt.Sprintf("oci://%s/plugins/%s:%s", s.config.Registry, pluginName, version),
+		Repository:  s.registry,
+		Data: &PluginData{
+			PluginType:            pluginType,
+			Runtime:               extractYAMLField(string(data), "runtime"),
+			HelmVersionConstraint: ">=4.0.0",
+		},
+		Keywords: []string{"helm", "helm-plugin", "helm4", pluginType},
+	}
+
+	s.plugins[pluginName] = append(s.plugins[pluginName], pkg)
+	log.Printf("Discovered local plugin: %s@%s", pluginName, version)
 }
 
 // extractYAMLField extracts a simple field from YAML content.
@@ -372,6 +414,7 @@ func main() {
 	repoName := flag.String("repo-name", "ref-hip-chart-defined-plugins", "Repository name")
 	repoID := flag.String("repo-id", "ref-hip-chart-defined-plugins", "Repository ID")
 	signingKey := flag.String("signing-key", "", "URL to signing key")
+	pluginsDir := flag.String("plugins-dir", "../plugins", "Local plugins directory for fallback discovery")
 	flag.Parse()
 
 	cfg := Config{
@@ -380,6 +423,7 @@ func main() {
 		RepoName:   *repoName,
 		RepoID:     *repoID,
 		SigningKey: *signingKey,
+		PluginsDir: *pluginsDir,
 	}
 
 	server := NewServer(cfg)

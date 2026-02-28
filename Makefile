@@ -299,12 +299,12 @@ show-cache:
 .PHONY: mock-artifacthub
 mock-artifacthub:
 	@echo -e "$(GREEN)Starting mock ArtifactHub server...$(NC)"
-	go run ./mock-artifacthub --registry ghcr.io/scottrigby/ref-hip-chart-defined-plugins
+	cd mock-artifacthub && go run . --registry ghcr.io/scottrigby/ref-hip-chart-defined-plugins
 
 .PHONY: mock-artifacthub-local
 mock-artifacthub-local:
 	@echo -e "$(GREEN)Starting mock ArtifactHub server (local registry)...$(NC)"
-	go run ./mock-artifacthub --registry $(OCI_REGISTRY)
+	cd mock-artifacthub && go run . --registry $(OCI_REGISTRY)
 
 # =============================================================================
 # Container e2e test (tests ArtifactHub integration from within container)
@@ -317,9 +317,9 @@ MOCK_ARTIFACTHUB_PORT := 8765
 test-container-e2e: build-plugins
 	@echo -e "$(GREEN)Running container e2e test with mock ArtifactHub...$(NC)"
 	@# Build mock server
-	go build -o mock-server ./mock-artifacthub
+	cd mock-artifacthub && go build -o mock-server .
 	@# Start mock server in background
-	./mock-server --registry $(CONTAINER_OCI_REGISTRY) --port $(MOCK_ARTIFACTHUB_PORT) &
+	./mock-artifacthub/mock-server --registry $(CONTAINER_OCI_REGISTRY) --port $(MOCK_ARTIFACTHUB_PORT) &
 	@sleep 2
 	@# Push plugins to OCI registry (using container-accessible address)
 	@for plugin in $(PLUGINS); do \
