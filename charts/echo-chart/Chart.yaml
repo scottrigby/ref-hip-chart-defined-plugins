@@ -1,6 +1,6 @@
 apiVersion: v3
 name: echo-chart
-version: 1.0.2
+version: 1.0.3
 description: Test chart for source-distributed plugin
 
 # This plugin is distributed as source code in the OCI registry.

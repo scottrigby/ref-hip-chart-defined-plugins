@@ -250,6 +250,8 @@ jobs:
 
       - name: Package and push chart
         if: steps.chart.outputs.skip != 'true'
+        env:
+          HELM_EXPERIMENTAL_CHART_V3: "1"
         run: |
           CHART_DIR="${{ steps.chart.outputs.dir }}"
           OCI_PATH="oci://${{ env.REGISTRY }}/${{ env.REPO_PATH }}/charts"
