@@ -139,17 +139,13 @@ oci-push-all:
 	@for plugin in $(PLUGINS); do \
 		echo -e "$(GREEN)Pushing $$plugin to OCI registry...$(NC)"; \
 		VERSION=$$(grep 'version:' $(CURDIR)/plugins/$$plugin/plugin.yaml | head -1 | awk '{print $$2}'); \
-		TMPDIR=$$(mktemp -d); \
-		mkdir -p "$$TMPDIR/$$plugin"; \
-		cp $(CURDIR)/plugins/$$plugin/plugin.yaml "$$TMPDIR/$$plugin/"; \
-		cp $(CURDIR)/plugins/$$plugin/plugin.wasm "$$TMPDIR/$$plugin/"; \
-		(cd "$$TMPDIR" && tar czf $$plugin-$$VERSION.tgz $$plugin && \
-			oras push --plain-http \
-				--disable-path-validation \
-				--artifact-type "application/vnd.helm.plugin.v1+json" \
-				$(OCI_REGISTRY)/plugins/$$plugin:$$VERSION \
-				"$$plugin-$$VERSION.tgz:application/vnd.oci.image.layer.v1.tar+gzip"); \
-		rm -rf "$$TMPDIR"; \
+		$(HELM_BIN) plugin package $(CURDIR)/plugins/$$plugin --sign=false; \
+		oras push --plain-http \
+			--disable-path-validation \
+			--artifact-type "application/vnd.helm.plugin.v1+json" \
+			$(OCI_REGISTRY)/plugins/$$plugin:$$VERSION \
+			"$$plugin-$$VERSION.tgz:application/vnd.oci.image.layer.v1.tar+gzip"; \
+		rm -f $$plugin-$$VERSION.tgz; \
 	done
 	@echo -e "$(GREEN)All plugins pushed to OCI registry$(NC)"
 
@@ -324,17 +320,13 @@ test-container-e2e: build-plugins
 	@# Push plugins to OCI registry (using container-accessible address)
 	@for plugin in $(PLUGINS); do \
 		VERSION=$$(grep 'version:' plugins/$$plugin/plugin.yaml | head -1 | awk '{print $$2}'); \
-		TMPDIR=$$(mktemp -d); \
-		mkdir -p "$$TMPDIR/$$plugin"; \
-		cp plugins/$$plugin/plugin.yaml "$$TMPDIR/$$plugin/"; \
-		cp plugins/$$plugin/plugin.wasm "$$TMPDIR/$$plugin/"; \
-		(cd "$$TMPDIR" && tar czf $$plugin-$$VERSION.tgz $$plugin && \
-			oras push --plain-http \
-				--disable-path-validation \
-				--artifact-type "application/vnd.helm.plugin.v1+json" \
-				$(CONTAINER_OCI_REGISTRY)/plugins/$$plugin:$$VERSION \
-				"$$plugin-$$VERSION.tgz:application/vnd.oci.image.layer.v1.tar+gzip"); \
-		rm -rf "$$TMPDIR"; \
+		$(HELM_BIN) plugin package plugins/$$plugin --sign=false; \
+		oras push --plain-http \
+			--disable-path-validation \
+			--artifact-type "application/vnd.helm.plugin.v1+json" \
+			$(CONTAINER_OCI_REGISTRY)/plugins/$$plugin:$$VERSION \
+			"$$plugin-$$VERSION.tgz:application/vnd.oci.image.layer.v1.tar+gzip"; \
+		rm -f $$plugin-$$VERSION.tgz; \
 	done
 	@# Test dependency update with mock ArtifactHub
 	@rm -f "$(CONTENT_CACHE)"/*.plugin 2>/dev/null || true
