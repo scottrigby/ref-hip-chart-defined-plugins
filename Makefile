@@ -20,7 +20,7 @@ HELM_FORK_BRANCH := chart-defined-plugins
 HELM_BIN := ./helm
 
 # Plugin list - add new plugins here
-PLUGINS := varsubst-render gotemplate-render sourcefiles-modifier test-processor globally-installed-fallback
+PLUGINS := varsubst-render gotemplate-render sourcefiles-modifier test-processor
 
 # Helm environment paths (deferred evaluation - helm binary may not exist at parse time)
 PLUGINS_DIR = $(shell $(HELM_BIN) env HELM_PLUGINS 2>/dev/null)
@@ -53,10 +53,10 @@ help:
 	@echo "Setup (run first):"
 	@echo "  make setup                   Fetch and build Helm with plugin support"
 	@echo "  make setup-helm              Just fetch/build Helm (if plugins already built)"
+	@echo "  make update-deps             Update all chart dependencies (rebuild Chart.lock)"
 	@echo ""
 	@echo "Quick start:"
 	@echo "  make test                    Run all tests (requires OCI registry)"
-	@echo "  make test-fallback-path      Run tests without OCI registry"
 	@echo "  make clean-all               Clean everything"
 	@echo ""
 	@echo "Build:"
@@ -71,7 +71,6 @@ help:
 	@echo "  make test-basic              Test basic rendering"
 	@echo "  make test-gotemplate         Test gotemplate plugin"
 	@echo "  make test-sequential         Test sequential plugin handoff"
-	@echo "  make test-fallback           Test fallback to globally installed"
 	@echo ""
 	@echo "Clean:"
 	@echo "  make clean                   Clean built wasm files"
@@ -154,6 +153,16 @@ oci-push-all:
 	done
 	@echo -e "$(GREEN)All plugins pushed to OCI registry$(NC)"
 
+.PHONY: update-deps
+update-deps:
+	@echo -e "$(GREEN)Updating all chart dependencies...$(NC)"
+	@for chart in charts/*/; do \
+		if [ -f "$$chart/Chart.yaml" ]; then \
+			echo "Updating $$chart"; \
+			$(HELM_BIN) dependency update "$$chart" --plain-http 2>/dev/null || true; \
+		fi; \
+	done
+
 .PHONY: test-oci-download
 test-oci-download:
 	@echo -e "$(GREEN)Testing OCI plugin download to content cache...$(NC)"
@@ -176,32 +185,6 @@ test-oci-render:
 oci-verify:
 	@echo -e "$(GREEN)Verifying OCI registry contents...$(NC)"
 	curl -s http://$(OCI_REGISTRY)/v2/_catalog | jq .
-
-# =============================================================================
-# Fallback path tests (local copy - simulates download without OCI)
-# =============================================================================
-
-.PHONY: test-fallback-path
-test-fallback-path: clean-plugins build-plugins copy-local-all test-all
-	@echo -e "$(GREEN)Fallback path tests passed!$(NC)"
-
-.PHONY: copy-local-all
-copy-local-all:
-	@for plugin in $(PLUGINS); do \
-		if [ "$$plugin" = "globally-installed-fallback" ]; then \
-			echo -e "$(GREEN)Copying $$plugin to non-versioned path (fallback test)...$(NC)"; \
-			mkdir -p "$(PLUGINS_DIR)/$$plugin"; \
-			cp plugins/$$plugin/plugin.yaml "$(PLUGINS_DIR)/$$plugin/"; \
-			cp plugins/$$plugin/plugin.wasm "$(PLUGINS_DIR)/$$plugin/"; \
-		else \
-			VERSION=$$(grep 'version:' plugins/$$plugin/plugin.yaml | head -1 | awk '{print $$2}'); \
-			echo -e "$(GREEN)Copying $$plugin $$VERSION to versioned path...$(NC)"; \
-			mkdir -p "$(PLUGINS_DIR)/versions/$$plugin/$$VERSION"; \
-			cp plugins/$$plugin/plugin.yaml "$(PLUGINS_DIR)/versions/$$plugin/$$VERSION/"; \
-			cp plugins/$$plugin/plugin.wasm "$(PLUGINS_DIR)/versions/$$plugin/$$VERSION/"; \
-		fi; \
-	done
-	@echo -e "$(GREEN)All plugins copied to local paths$(NC)"
 
 # =============================================================================
 # Individual test targets
@@ -255,18 +238,8 @@ test-no-plugin:
 	$(HELM_BIN) template test "$$TMPDIR" && \
 	rm -rf "$$TMPDIR"
 
-.PHONY: test-fallback
-test-fallback:
-	@echo -e "$(GREEN)Test: Fallback to Non-Versioned Path$(NC)"
-	@test ! -d "$(PLUGINS_DIR)/versions/globally-installed-fallback/0.1.0" || (echo "FAIL: Plugin should not be in versioned path" && exit 1)
-	@test -f "$(PLUGINS_DIR)/globally-installed-fallback/plugin.yaml" || (echo "FAIL: Plugin not in non-versioned path" && exit 1)
-	@OUTPUT=$$($(HELM_BIN) template my-release charts/fallback-test-chart/) && \
-	echo "$$OUTPUT" && \
-	echo "$$OUTPUT" | grep -q 'fallbackWorked: "true"' || (echo "FAIL: Expected fallbackWorked: true" && exit 1) && \
-	echo -e "$(GREEN)OK: Fallback worked$(NC)"
-
 .PHONY: test-all
-test-all: test-basic test-values test-namespace test-debug test-no-plugin test-gotemplate test-sequential test-fallback
+test-all: test-basic test-values test-namespace test-debug test-no-plugin test-gotemplate test-sequential
 	@echo -e "$(GREEN)All individual tests passed!$(NC)"
 
 # =============================================================================
@@ -293,7 +266,6 @@ clean-plugins:
 	@for plugin in $(PLUGINS); do \
 		rm -rf "$(PLUGINS_DIR)/versions/$$plugin"; \
 	done
-	rm -rf "$(PLUGINS_DIR)/globally-installed-fallback"
 
 .PHONY: clean-helm
 clean-helm:

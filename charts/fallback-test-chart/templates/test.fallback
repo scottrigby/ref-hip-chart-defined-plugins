@@ -1,3 +1,0 @@
-# This file will be processed by the globally-installed-fallback plugin
-test-key: test-value
-fallback-test: enabled

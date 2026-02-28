@@ -1,9 +1,0 @@
-apiVersion: v1
-name: globally-installed-fallback
-version: 0.1.0
-description: Test plugin for verifying fallback to non-versioned (globally installed) plugin path
-runtime: extism/v1
-type: render/v1
-config:
-  patterns:
-    - "templates/*.fallback"

@@ -35,18 +35,17 @@ This document describes how to manually test the chart-defined plugin system.
 
 Chart-defined plugins use content-addressable storage:
 
-| Storage Type      | Path                                       | Purpose                                      |
-| ----------------- | ------------------------------------------ | -------------------------------------------- |
-| **Content Cache** | `$HELM_CACHE_HOME/content/{digest}.plugin` | Plugin tarballs stored by SHA256 digest      |
-| **Wazero Cache**  | `$HELM_CACHE_HOME/wazero-build/`           | JIT-compiled Wasm modules (8x faster)        |
-| **Fallback**      | `$HELM_PLUGINS/<name>/`                    | Globally installed plugins (directory-based) |
+| Storage Type      | Path                                       | Purpose                                 |
+| ----------------- | ------------------------------------------ | --------------------------------------- |
+| **Content Cache** | `$HELM_CACHE_HOME/content/{digest}.plugin` | Plugin tarballs stored by SHA256 digest |
+| **Wazero Cache**  | `$HELM_CACHE_HOME/wazero-build/`           | JIT-compiled Wasm modules (8x faster)   |
 
 **Key point**: Chart-defined plugins are loaded **directly from tarballs** at runtime.
 No extraction to disk is needed - the `plugin.yaml` and `.wasm` files are read into memory.
 
 ## Testing Approaches
 
-### Approach A: OCI Registry (Primary - Tests Full Flow)
+### OCI Registry (Tests Full Flow)
 
 This tests the complete chart-defined plugin workflow:
 
@@ -76,26 +75,11 @@ find $(./helm env HELM_CACHE_HOME)/content -name "*.plugin"
 ./helm template my-release charts/varsubst-chart/
 ```
 
-### Approach B: Local Copy (Tests Fallback Path)
-
-This tests the versioned directory and global fallback loading (without OCI):
-
-```bash
-# Copy plugins to versioned directories
-make copy-local-all
-
-# Test rendering (uses directory-based loading)
-./helm template my-release charts/varsubst-chart/
-```
-
 ## Quick Test Commands
 
 ```bash
 # Run full OCI integration tests
 make test
-
-# Run fallback path tests (no OCI registry needed)
-make test-fallback-path
 ```
 
 ## Individual Test Cases
@@ -139,17 +123,7 @@ make test-sequential
 - Plugin 2 receives only the modified file set
 - Output shows which files each plugin processed
 
-### Test 4: Fallback to Global Install
-
-**Purpose**: Verify fallback when versioned path not found.
-
-```bash
-make test-fallback
-```
-
-**Expected**: Chart renders using globally installed plugin (non-versioned path).
-
-### Test 5: Gotemplate as Render Plugin
+### Test 4: Gotemplate as Render Plugin
 
 **Purpose**: Verify gotemplate can be used as a render/v1 plugin.
 
@@ -222,7 +196,6 @@ docker stop registry && docker rm registry
 ## Verification Checklist
 
 - [ ] OCI download -> content cache -> archive loading works
-- [ ] Fallback to globally installed plugins works
 - [ ] Sequential plugin execution preserves file modifications
 - [ ] Values, release info, and capabilities passed correctly
 - [ ] Charts without plugins use default gotemplate engine

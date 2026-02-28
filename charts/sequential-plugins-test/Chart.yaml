@@ -17,8 +17,8 @@ plugins:
   - name: sourcefiles-modifier
     type: render/v1
     repository: oci://127.0.0.1:5001/plugins/sourcefiles-modifier
-    version: 0.1.0
+    version: 0.1.1
   - name: test-processor
     type: render/v1
     repository: oci://127.0.0.1:5001/plugins/test-processor
-    version: 0.1.0
+    version: 0.1.1
