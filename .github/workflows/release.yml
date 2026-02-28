@@ -118,15 +118,9 @@ jobs:
         run: |
           git clone --depth 1 --branch chart-defined-plugins https://github.com/scottrigby/helm.git helm-build
           cd helm-build && make build
-          mkdir -p $HOME/.local/bin
-          mv bin/helm $HOME/.local/bin/helm
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          sudo mv bin/helm /usr/local/bin/helm4fork
           rm -rf helm-build
-      - name: Verify Helm version
-        if: steps.plugin.outputs.skip != 'true'
-        run: |
-          which helm
-          helm version
+          /usr/local/bin/helm4fork version
 
       - name: Set up ORAS
         if: steps.plugin.outputs.skip != 'true'
@@ -151,7 +145,7 @@ jobs:
             echo "Signing plugin package..."
             base64 -d <<< "${{ secrets.GPG_KEYRING_BASE64 }}" > secring.gpg
             echo "${{ secrets.GPG_PASSPHRASE }}" > passphrase.txt
-            helm plugin package --sign \
+            /usr/local/bin/helm4fork plugin package --sign \
               --key '${{ vars.SIGNING_KEY_EMAIL }}' \
               --keyring secring.gpg \
               --passphrase-file passphrase.txt \
@@ -159,7 +153,7 @@ jobs:
             rm -f passphrase.txt secring.gpg
             echo "signed=true" >> $GITHUB_OUTPUT
           else
-            helm plugin package --sign=false "$PLUGIN_DIR"
+            /usr/local/bin/helm4fork plugin package --sign=false "$PLUGIN_DIR"
             echo "signed=false" >> $GITHUB_OUTPUT
           fi
 
@@ -245,21 +239,14 @@ jobs:
         run: |
           git clone --depth 1 --branch chart-defined-plugins https://github.com/scottrigby/helm.git helm-build
           cd helm-build && make build
-          mkdir -p $HOME/.local/bin
-          mv bin/helm $HOME/.local/bin/helm
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          sudo mv bin/helm /usr/local/bin/helm4fork
           rm -rf helm-build
-
-      - name: Verify Helm version
-        if: steps.chart.outputs.skip != 'true'
-        run: |
-          which helm
-          helm version
+          /usr/local/bin/helm4fork version
 
       - name: Log in to Container Registry
         if: steps.chart.outputs.skip != 'true'
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | /usr/local/bin/helm4fork registry login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
 
       - name: Package and push chart
         if: steps.chart.outputs.skip != 'true'
@@ -267,8 +254,8 @@ jobs:
           CHART_DIR="${{ steps.chart.outputs.dir }}"
           OCI_PATH="oci://${{ env.REGISTRY }}/${{ env.REPO_PATH }}/charts"
 
-          helm package "$CHART_DIR"
-          helm push "${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz" "$OCI_PATH"
+          /usr/local/bin/helm4fork package "$CHART_DIR"
+          /usr/local/bin/helm4fork push "${{ steps.chart.outputs.name }}-${{ steps.chart.outputs.version }}.tgz" "$OCI_PATH"
 
       - name: Create tag
         if: steps.chart.outputs.skip != 'true'

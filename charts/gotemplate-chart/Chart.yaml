@@ -1,6 +1,6 @@
 apiVersion: v3
 name: gotemplate-example
-version: 1.0.1
+version: 1.0.2
 description: A test chart for the gotemplate render plugin
 
 plugins:
