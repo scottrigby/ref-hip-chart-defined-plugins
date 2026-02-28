@@ -9,4 +9,4 @@ plugins:
   - name: varsubst-render
     type: render/v1
     repository: oci://127.0.0.1:5001/plugins/varsubst-render
-    version: 0.1.1
+    version: 0.1.2

@@ -7,6 +7,6 @@ description: Test chart for source-distributed plugin
 # Helm will download and compile it automatically.
 plugins:
   - name: echo-render
-    version: 0.1.1
+    version: 0.1.2
     type: render/v1
     repository: oci://127.0.0.1:5001/plugins/echo-render
