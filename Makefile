@@ -253,8 +253,8 @@ clean:
 .PHONY: clean-cache
 clean-cache:
 	@echo -e "$(YELLOW)Cleaning content cache and wazero cache...$(NC)"
-	rm -f "$(CONTENT_CACHE)"/*.plugin 2>/dev/null || true
-	rm -rf "$(WAZERO_CACHE)" 2>/dev/null || true
+	rm "$(CONTENT_CACHE)"/*/*.plugin 2>/dev/null || true
+	rm -r "$(WAZERO_CACHE)" 2>/dev/null || true
 
 .PHONY: clean-plugins
 clean-plugins:
@@ -284,7 +284,7 @@ list-plugins:
 .PHONY: show-cache
 show-cache:
 	@echo -e "$(GREEN)Content cache:$(NC)"
-	ls -la "$(CONTENT_CACHE)"/*.plugin 2>/dev/null || echo "  (empty)"
+	find "$(CONTENT_CACHE)" -name "*.plugin" -type f 2>/dev/null | xargs ls -la 2>/dev/null || echo "  (empty)"
 	@echo -e "$(GREEN)Wazero cache:$(NC)"
 	ls -la "$(WAZERO_CACHE)" 2>/dev/null || echo "  (empty)"
 
@@ -329,7 +329,7 @@ test-container-e2e: build-plugins
 		rm -f $$plugin-$$VERSION.tgz; \
 	done
 	@# Test dependency update with mock ArtifactHub
-	@rm -f "$(CONTENT_CACHE)"/*.plugin 2>/dev/null || true
+	@rm "$(CONTENT_CACHE)"/*/*.plugin 2>/dev/null || true
 	$(HELM_BIN) dependency update charts/container-test-chart/ --plain-http \
 		--artifacthub-endpoint http://localhost:$(MOCK_ARTIFACTHUB_PORT)
 	@# Verify plugin was cached
