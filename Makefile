@@ -155,15 +155,15 @@ update-deps:
 	@for chart in charts/*/; do \
 		if [ -f "$$chart/Chart.yaml" ]; then \
 			echo "Updating $$chart"; \
-			$(HELM_BIN) dependency update "$$chart" --plain-http 2>/dev/null || true; \
+			$(HELM_BIN) dependency update "$$chart" --plain-http --verify=false 2>/dev/null || true; \
 		fi; \
 	done
 
 .PHONY: test-oci-download
 test-oci-download:
 	@echo -e "$(GREEN)Testing OCI plugin download to content cache...$(NC)"
-	$(HELM_BIN) dependency update charts/varsubst-chart/ --plain-http
-	$(HELM_BIN) dependency update charts/gotemplate-chart/ --plain-http
+	$(HELM_BIN) dependency update charts/varsubst-chart/ --plain-http --verify=false
+	$(HELM_BIN) dependency update charts/gotemplate-chart/ --plain-http --verify=false
 	@echo -e "$(GREEN)Verifying content cache...$(NC)"
 	@find "$(CONTENT_CACHE)" -name "*.plugin" -type f 2>/dev/null | head -1 | grep -q . || \
 		(echo "FAIL: No .plugin files in content cache ($(CONTENT_CACHE))" && exit 1)
@@ -331,7 +331,7 @@ test-container-e2e: build-plugins
 	@# Test dependency update with mock ArtifactHub
 	@rm "$(CONTENT_CACHE)"/*/*.plugin 2>/dev/null || true
 	$(HELM_BIN) dependency update charts/container-test-chart/ --plain-http \
-		--artifacthub-endpoint http://localhost:$(MOCK_ARTIFACTHUB_PORT)
+		--artifacthub-endpoint http://localhost:$(MOCK_ARTIFACTHUB_PORT) --verify=false
 	@# Verify plugin was cached
 	@test -n "$$(find "$(HELM_CACHE_HOME)/content" -name '*.plugin' 2>/dev/null | head -1)" || \
 		(echo "FAIL: No plugins in content cache" && exit 1)
