@@ -1,0 +1,9 @@
+dependencies: null
+digest: sha256:643d5437104296e21d906ecb15b2c96ad278f20cfc4af53b12bb6069bd853726
+generated: "0001-01-01T00:00:00Z"
+plugins:
+- digest: 1bc133ac33379f1f970c15bd48ce8c00813d3d627da11f3629e5ba78325762a9
+  name: varsubst-render
+  repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/varsubst-render
+  type: render/v1
+  version: 0.1.4

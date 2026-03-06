@@ -1,0 +1,14 @@
+dependencies: null
+digest: sha256:643d5437104296e21d906ecb15b2c96ad278f20cfc4af53b12bb6069bd853726
+generated: "0001-01-01T00:00:00Z"
+plugins:
+- digest: 296bfe20e40796a3f6c731358ea60a885ece4026bc89c5e34958090378662acf
+  name: sourcefiles-modifier
+  repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/sourcefiles-modifier
+  type: render/v1
+  version: 0.1.4
+- digest: ac4285a2f9c64f849a1c0a2a4ec95dbea6ddd7270b68f1287a1da808f9fccd6f
+  name: test-processor
+  repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/test-processor
+  type: render/v1
+  version: 0.1.4

@@ -1,0 +1,9 @@
+dependencies: null
+digest: sha256:643d5437104296e21d906ecb15b2c96ad278f20cfc4af53b12bb6069bd853726
+generated: "0001-01-01T00:00:00Z"
+plugins:
+- digest: cd9b87fd40ff6961e430b7e5233e6b69f1196a92d20ad00c5c018859e40d9643
+  name: gotemplate-render
+  repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/gotemplate-render
+  type: render/v1
+  version: 0.1.4

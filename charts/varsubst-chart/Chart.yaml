@@ -9,4 +9,4 @@ plugins:
   - name: varsubst-render
     type: render/v1
     repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/varsubst-render
-    version: 0.1.3
+    version: 0.1.4

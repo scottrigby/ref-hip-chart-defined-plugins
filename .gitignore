@@ -8,10 +8,10 @@ charts/*/plugin.wasm
 helm
 .helm-build/
 
-# Chart.lock files - these test charts use local OCI registry with digests
-# that change on every plugin rebuild. For production charts, you'd typically
-# commit Chart.lock for reproducible builds.
-charts/*/Chart.lock
+# Chart.lock for container-test-chart is gitignored because it uses a local OCI
+# registry (host.containers.internal:5001) whose digests change on each rebuild.
+# Chart.lock files for charts that reference GHCR are committed for reproducible builds.
+charts/container-test-chart/Chart.lock
 
 # Temporary files
 *.tmp

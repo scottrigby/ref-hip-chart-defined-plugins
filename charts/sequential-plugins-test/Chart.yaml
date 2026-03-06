@@ -17,8 +17,8 @@ plugins:
   - name: sourcefiles-modifier
     type: render/v1
     repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/sourcefiles-modifier
-    version: 0.1.3
+    version: 0.1.4
   - name: test-processor
     type: render/v1
     repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/test-processor
-    version: 0.1.3
+    version: 0.1.4

@@ -37,6 +37,9 @@ GO_BUILD_CMD := go build -buildmode=c-shared
 # Container: host.containers.internal:5001 (Podman/Docker container)
 OCI_REGISTRY ?= 127.0.0.1:5001
 
+# Chart v3 experimental gate (required for helm template/install with v3 charts)
+export HELM_EXPERIMENTAL_CHART_V3 := 1
+
 # Colors
 GREEN := \033[0;32m
 YELLOW := \033[0;33m
@@ -155,7 +158,7 @@ update-deps:
 	@for chart in charts/*/; do \
 		if [ -f "$$chart/Chart.yaml" ]; then \
 			echo "Updating $$chart"; \
-			$(HELM_BIN) dependency update "$$chart" --plain-http --verify=false 2>/dev/null || true; \
+			$(HELM_BIN) dependency update "$$chart" --verify=false 2>/dev/null || true; \
 		fi; \
 	done
 
@@ -235,7 +238,7 @@ test-no-plugin:
 	rm -rf "$$TMPDIR"
 
 .PHONY: test-all
-test-all: test-basic test-values test-namespace test-debug test-no-plugin test-gotemplate test-sequential
+test-all: update-deps test-basic test-values test-namespace test-debug test-no-plugin test-gotemplate test-sequential
 	@echo -e "$(GREEN)All individual tests passed!$(NC)"
 
 # =============================================================================

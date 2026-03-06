@@ -1,0 +1,9 @@
+dependencies: null
+digest: sha256:643d5437104296e21d906ecb15b2c96ad278f20cfc4af53b12bb6069bd853726
+generated: "0001-01-01T00:00:00Z"
+plugins:
+- digest: 86e7e599ab02f085e631f5c76c5575b0de93c8b1daed1d1b13496ba991b1f60f
+  name: echo-render
+  repository: oci://ghcr.io/scottrigby/ref-hip-chart-defined-plugins/plugins/echo-render
+  type: render/v1
+  version: 0.1.4
